@@ -1,12 +1,16 @@
 import json
 from random import shuffle
-from typing import List
+from typing import List, Tuple
 
 from .card import Card
 
 
 class Deck:
     cards: List[Card]
+    faces: List[Tuple[int, str]]
+    """ Faces available in the pack. """
+    ranks: List[Tuple[int, str]]
+    """ Ranks available in the pack. """
 
     def __init__(self, deck_data: any = None):
         self.cards = []
@@ -23,6 +27,8 @@ class Deck:
 
     def load_deck_file(self, deck_file: str) -> None:
         self.cards = []
+        self.faces = []
+        self.ranks = []
 
         with open(deck_file, "r") as fp:
             deck_obj = json.load(fp)
@@ -30,8 +36,12 @@ class Deck:
                 raise ValueError("Bad deck file!")
 
         for f_idx, face in enumerate(deck_obj["faces"]):
+            face_tpl = (f_idx, face)
+            self.faces.append(face_tpl)
             for r_idx, rank in enumerate(deck_obj["ranks"]):
-                self.cards.append(Card((f_idx, face), (r_idx, rank)))
+                rank_tpl = (r_idx, rank)
+                self.ranks.append(face_tpl)
+                self.cards.append(Card(face_tpl, rank_tpl))
 
     def shuffle(self) -> None:
         shuffle(self.cards)
