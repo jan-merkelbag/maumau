@@ -12,6 +12,9 @@ class MauMau:
     player_hands: Dict[str, Hand]
     finishers: List[str]
 
+    cards_to_draw: int
+    miss_turn: bool
+
     def __init__(self, player_names: List[str]):
         self.deck = Deck("./packs/french_32.json")
         self.table = Hand()
@@ -30,10 +33,19 @@ class MauMau:
         self.table.draw_from(self.deck, 1)
 
     @staticmethod
-    def prompt_card(hand: Hand) -> int | str:
+    def prompt_card(player_hand: Hand,
+                    current_card: Card,
+                    cards_to_draw: int,
+                    active_players_card_count: Dict[str, int],
+                    ) -> int | str:
         prompt = "Your hand is:\n"
-        prompt += "\n".join([f"{idx + 1}: {card}" for idx, card in enumerate(hand.cards)])
+        prompt += "\n".join([f"{idx + 1}: {card}" for idx, card in enumerate(player_hand.cards)])
         prompt += "\nd: draw"
+        prompt += f"\n{current_card} lies on top of the table."
+        if cards_to_draw > 1:
+            prompt += f" If you chose to draw, you will have to draw {cards_to_draw} cards."
+        else:
+            prompt += " You are not affected by it."
         prompt += "\nWhich card do you want to play? "
         choice = input(prompt)
 
@@ -52,7 +64,7 @@ class MauMau:
     def stupid_ai(self,
                   player_hand: Hand,
                   current_card: Card,
-                  affected: bool,
+                  cards_to_draw: int,
                   active_players_card_count: Dict[str, int],
                   ) -> int | str:
         """
@@ -69,7 +81,7 @@ class MauMau:
         for idx, card in enumerate(player_hand.cards):
             if self.is_card_allowed(card):
                 if (current_card.rank[1] == 7 and card.rank[1] == 7) \
-                        or current_card.rank[1] != 7 or not affected:
+                        or current_card.rank[1] != 7 or cards_to_draw < 2:
                     return idx
         return "d"
 
@@ -77,14 +89,14 @@ class MauMau:
                     choice_method: Callable,
                     player_hand: Hand,
                     current_card: Card,
-                    affected: bool,
+                    cards_to_draw: int,
                     active_players_card_count: Dict[str, int],
                     ):
         while True:
             choice = choice_method(player_hand=player_hand,
                                    current_card=current_card,
-                                   affected=affected,
-                                   active_players_card_count=active_players_card_count,)
+                                   cards_to_draw=cards_to_draw,
+                                   active_players_card_count=active_players_card_count, )
             try:
                 choice = int(choice)
                 if choice > len(player_hand.cards) - 1 or choice < 0:
@@ -133,8 +145,8 @@ class MauMau:
     def run(self, protagonist: str | None = None):
         print(f"Table: {self.table.cards[-1]}")
         # In case of a 7, records how many cards are to be drawn if 7 chain is not continued
-        cards_to_draw = 1  # Start at 1, because it is also used for normal drawing
-        skipping = False  # Record if an 8 is played
+        self.cards_to_draw = 1  # Start at 1, because it is also used for normal drawing
+        self.miss_turn = False  # Record if an 8 is played
         while True:
             for player_name, player_hand in self.player_hands.items():
                 if player_name in self.finishers:
@@ -143,15 +155,12 @@ class MauMau:
                 if len(self.deck.cards) < 1:
                     self.replenish_deck()
 
-                if skipping:
-                    skipping = False
+                if self.miss_turn:
+                    self.miss_turn = False
                     print(f"{player_name} is skipped due to card, and has {len(player_hand.cards)} cards left")
                     continue
 
                 def do_player_turn():
-                    nonlocal cards_to_draw
-                    nonlocal skipping
-
                     # Force to draw or chain in case of a 7
                     while True:
                         picker_func = self.stupid_ai  # AI move
@@ -161,35 +170,36 @@ class MauMau:
                         choice = self.pick_a_card(choice_method=picker_func,
                                                   player_hand=player_hand,
                                                   current_card=self.table.cards[-1],
-                                                  affected=cards_to_draw != 1,  # the only affection so far
-                                                  active_players_card_count={pn: len(ph.cards) for pn, ph in self.player_hands.items()})
+                                                  cards_to_draw=self.cards_to_draw,  # the only affection so far
+                                                  active_players_card_count={pn: len(ph.cards) for pn, ph in
+                                                                             self.player_hands.items()})
                         if choice == "d":
-                            if len(self.deck.cards) < cards_to_draw:
+                            if len(self.deck.cards) < self.cards_to_draw:
                                 self.replenish_deck()
-                                if len(self.deck.cards) < cards_to_draw:
-                                    cards_to_draw = len(self.deck.cards)
-                            if cards_to_draw > 0:
-                                player_hand.draw_from(self.deck, cards_to_draw)
+                                if len(self.deck.cards) < self.cards_to_draw:
+                                    self.cards_to_draw = len(self.deck.cards)
+                            if self.cards_to_draw > 0:
+                                player_hand.draw_from(self.deck, self.cards_to_draw)
                                 player_hand.sort()
-                            if cards_to_draw == 1:
+                            if self.cards_to_draw == 1:
                                 print(f"{player_name} drew a card, and has {len(player_hand.cards)} cards left")
                             else:
-                                print(
-                                    f"{player_name} drew {cards_to_draw} cards, and has {len(player_hand.cards)} cards left")
-                            cards_to_draw = 1
+                                print(f"{player_name} drew {self.cards_to_draw} cards, "
+                                      f"and has {len(player_hand.cards)} cards left")
+                            self.cards_to_draw = 1
                         else:
-                            if cards_to_draw > 1 and player_hand.cards[choice].rank[1] != 7:
+                            if self.cards_to_draw > 1 and player_hand.cards[choice].rank[1] != 7:
                                 print(f"You cannot play a {player_hand.cards[choice].rank[1]} in response to a 7!")
-                                print(f"You have to either draw {cards_to_draw} cards or chain with another 7!")
+                                print(f"You have to either draw {self.cards_to_draw} cards or chain with another 7!")
                                 continue
                             played_card = player_hand.cards.pop(choice)
                             self.table.cards.append(played_card)
                             if played_card.rank[1] == 7:
-                                if cards_to_draw < 2:
-                                    cards_to_draw = 0
-                                cards_to_draw += 2
+                                if self.cards_to_draw < 2:
+                                    self.cards_to_draw = 0
+                                self.cards_to_draw += 2
                             elif played_card.rank[1] == 8:
-                                skipping = True
+                                self.miss_turn = True
                             print(f"{player_name} played {played_card}, and has {len(player_hand.cards)} cards left")
                         break
 
