@@ -1,13 +1,19 @@
 from random import shuffle
 
 from maumau import MauMau
+from maumau import HumanPlayer, StupidAI
 
 
 def main():
-    players = ["Jan", "Alpha", "Beta", "Gamma"]
+    players = [
+        HumanPlayer("Jan"),
+        StupidAI("Alpha"),
+        StupidAI("Beta"),
+        StupidAI("Gamma"),
+    ]
     shuffle(players)
     maumau = MauMau(players)
-    maumau.run("Jan")
+    maumau.run()
 
 
 if __name__ == '__main__':
