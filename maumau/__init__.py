@@ -4,6 +4,7 @@ from typing import List, Dict, Callable
 
 from cards import Deck, Hand, Card
 from cards.card import IndexedSymbol
+from .errors import CardNotAllowedError
 
 
 class MauMau:
@@ -126,12 +127,7 @@ class MauMau:
                 if choice > len(player_hand.cards) - 1 or choice < 0:
                     print("Invalid option!")
                     continue
-                picked_card = player_hand.cards[choice]
-
-                if not self.is_card_allowed(picked_card):
-                    print("Bad choice!")
-                else:
-                    break
+                break
             except ValueError:
                 if choice in ["d"]:
                     break
@@ -294,6 +290,9 @@ class MauMau:
                   player_hand: Hand,
                   choice: int
                   ) -> None:
+        if not self.is_card_allowed(player_hand.cards[choice]):
+            raise CardNotAllowedError(player_hand.cards[choice], self.table.cards[-1], self.next_face)
+
         played_card = player_hand.cards.pop(choice)
         self.table.cards.append(played_card)
         print(f"{player_name} played {played_card}, and has {len(player_hand.cards)} cards left.")
@@ -369,7 +368,11 @@ class MauMau:
                             if not self.enforce_chain(player_hand.cards[choice]):
                                 continue
 
-                            self.play_card(player_is_protagonist, player_name, player_hand, choice)
+                            try:
+                                self.play_card(player_is_protagonist, player_name, player_hand, choice)
+                            except CardNotAllowedError as e:
+                                print(e)
+                                continue
                         else:
                             raise Exception("Unexpected choice")
                         break
