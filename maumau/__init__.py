@@ -103,7 +103,7 @@ class MauMau:
                 if (current_card.rank.symbol == "7" and card.rank.symbol == "7") \
                         or current_card.rank.symbol != "7" or cards_to_draw < 2:
                     return idx
-        if a_jake is not None:
+        if a_jake is not None and cards_to_draw < 2:
             return a_jake
         return "d"
 
