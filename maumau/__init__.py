@@ -7,6 +7,8 @@ from cards.card import IndexedSymbol
 
 
 class MauMau:
+    DEBUG: bool = False
+
     deck: Deck
     table: Hand
 
@@ -295,8 +297,23 @@ class MauMau:
         # In case of a 7, records how many cards are to be drawn if 7 chain is not continued
         self.cards_to_draw = 1  # Start at 1, because it is also used for normal drawing
         self.miss_turn = False  # Record if an 8 is played
+        turn = 0
         while True:
+            turn += 1
             for player_name, player_hand in self.player_hands.items():
+
+                if self.DEBUG:
+                    print("============\n"
+                          "DEBUGGING\n"
+                          "------------\n"
+                          f"Current turn: {turn}\n"
+                          f"Table hand: {[str(card.face) + str(card.rank) for card in self.table.cards]}\n"
+                          "%s\n"
+                          f"Next face: {self.next_face}\n"
+                          f"Miss turn: {self.miss_turn}\n"
+                          f"Cards to draw: {self.cards_to_draw}\n"
+                          "============\n" % ("\n".join([f"{pn}: {ph}" for pn, ph in self.player_hands.items()]),))
+
                 if player_name in self.finishers:
                     continue
 
