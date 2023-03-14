@@ -68,7 +68,7 @@ class MauMau:
         # - is a Jake
         return card.face == self.next_face \
             or card.rank == self.table.cards[-1].rank \
-            or card.rank == "J"
+            or card.rank[1] == "J"
 
     def stupid_ai(self,
                   player_hand: Hand,
