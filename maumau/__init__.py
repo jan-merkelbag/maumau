@@ -132,7 +132,7 @@ class MauMau:
                     print("Bad choice!")
                 else:
                     break
-            except ValueError as e:
+            except ValueError:
                 if choice in ["d"]:
                     break
                 elif choice == "!":
