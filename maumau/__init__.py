@@ -51,10 +51,11 @@ class MauMau:
         prompt += f"\n{current_card} lies on top of the table."
         if current_face != current_card.face:
             prompt += f" The current face is {current_face.symbol}."
-        if cards_to_draw > 1:
-            prompt += f" If you chose to draw, you will have to draw {cards_to_draw} cards."
-        else:
-            prompt += " You are not affected by it."
+        if current_card.rank.symbol in ["7", "8"]:
+            if cards_to_draw > 1:
+                prompt += f" If you chose to draw, you will have to draw {cards_to_draw} cards."
+            else:
+                prompt += " You are not affected by it."
         prompt += "\nWhich card do you want to play? "
         choice = input(prompt)
 
