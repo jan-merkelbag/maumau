@@ -37,6 +37,7 @@ class MauMau:
         self.table.draw_from(self.deck, 1)
         self.next_face = self.table.cards[-1].face
 
+    # noinspection PyUnusedLocal
     @staticmethod
     def prompt_card(player_hand: Hand,
                     current_card: Card,
@@ -73,6 +74,7 @@ class MauMau:
             or card.rank == self.table.cards[-1].rank \
             or card.rank.symbol == "J"
 
+    # noinspection PyUnusedLocal
     def stupid_ai(self,
                   player_hand: Hand,
                   current_card: Card,
@@ -188,6 +190,7 @@ class MauMau:
 
         return available_faces[int(choice) - 1]
 
+    # noinspection PyUnusedLocal
     @staticmethod
     def stupid_ai_face(player_hand: Hand,
                        current_face: IndexedSymbol,
