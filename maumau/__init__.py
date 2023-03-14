@@ -102,13 +102,13 @@ class MauMau:
         return "d"
 
     def pick_a_card(self,
-                    choice_method: Callable[..., int],
+                    choice_method: Callable[..., int | str],
                     player_hand: Hand,
                     current_card: Card,
                     current_face: Tuple[int, str],
                     cards_to_draw: int,
                     active_players_card_count: Dict[str, int],
-                    ):
+                    ) -> int | str:
         while True:
             choice = choice_method(player_hand=player_hand,
                                    current_card=current_card,
@@ -147,12 +147,18 @@ class MauMau:
         print("Game over!\nScore board:")
         print("\n".join([f"{idx + 1}.: {pn}" for idx, pn in enumerate(self.finishers)]))
 
-    def replenish_deck(self):
-        old_cards = self.table.cards[:-1]
-        shuffle(old_cards)
-        self.deck.cards = old_cards + self.deck.cards
-        self.table.cards = self.table.cards[-1:]
-        print("Deck was replenished")
+    def replenish_deck(self, min_cnt: int | None = None) -> None:
+        """
+        Replenish deck if it has less than min_cnt cards. If None is passed, the deck will be replenished regardless.
+        :param min_cnt: (optional) The required amount of cards. If the deck contains more cards, do not replenish.
+        :return: Nothing.
+        """
+        if min_cnt is None or len(self.deck.cards) < min_cnt:
+            old_cards = self.table.cards[:-1]
+            shuffle(old_cards)
+            self.deck.cards = old_cards + self.deck.cards
+            self.table.cards = self.table.cards[-1:]
+            print("Deck was replenished")
 
     def get_draw_count(self):
         count = 0
@@ -209,6 +215,82 @@ class MauMau:
 
         return chosen_face
 
+    def draw_cards(self, player_name: str, player_hand: Hand):
+        self.replenish_deck(self.cards_to_draw)
+        if len(self.deck.cards) < self.cards_to_draw:
+            self.cards_to_draw = len(self.deck.cards)
+        if self.cards_to_draw > 0:
+            player_hand.draw_from(self.deck, self.cards_to_draw)
+            player_hand.sort()
+        if self.cards_to_draw == 1:
+            print(f"{player_name} drew a card, and has {len(player_hand.cards)} cards left.")
+        else:
+            print(f"{player_name} drew {self.cards_to_draw} cards, "
+                  f"and has {len(player_hand.cards)} cards left.")
+        self.cards_to_draw = 1
+
+    def choose_action(self, player_is_protagonist: bool, player_hand: Hand) -> int | str:
+        picker_func = self.stupid_ai  # AI move
+        if player_is_protagonist:  # human move
+            picker_func = self.prompt_card
+
+        return self.pick_a_card(choice_method=picker_func,
+                                player_hand=player_hand,
+                                current_card=self.table.cards[-1],
+                                current_face=self.next_face,
+                                cards_to_draw=self.cards_to_draw,  # the only affection so far
+                                active_players_card_count={pn: len(ph.cards) for pn, ph in
+                                                           self.player_hands.items()})
+
+    def player_chains(self, player_hand: Hand, choice: int) -> bool:
+        """
+        Check if the player chained properly, and tell them otherwise.
+        :param player_hand:
+        :param choice:
+        :return: Whether the player chained.
+        """
+        if self.cards_to_draw > 1 and player_hand.cards[choice].rank[1] != 7:
+            print(f"You cannot play a {player_hand.cards[choice].rank[1]} in response to a 7!")
+            print(f"You have to either draw {self.cards_to_draw} cards or chain with another 7!")
+            return False
+        return True
+
+    def play_card(self,
+                  player_is_protagonist: bool,
+                  player_name: str,
+                  player_hand: Hand,
+                  choice: int
+                  ) -> None:
+        played_card = player_hand.cards.pop(choice)
+        self.table.cards.append(played_card)
+        print(f"{player_name} played {played_card}, and has {len(player_hand.cards)} cards left.")
+
+        # Handle 7 - next player has to draw 2 cards or chain
+        if played_card.rank[1] == 7:
+            if self.cards_to_draw < 2:
+                self.cards_to_draw = 0
+            self.cards_to_draw += 2
+
+        # Handle 8 - next player misses their turn
+        if played_card.rank[1] == 8:
+            self.miss_turn = True
+
+        # Handle J - current player can change face to whatever they want
+        if played_card.rank[1] == "J":
+            self.choose_face(player_is_protagonist, player_name, player_hand)
+        else:
+            self.next_face = played_card.face
+
+    def choose_face(self, player_is_protagonist: bool, player_name: str, player_hand: Hand):
+        face_picker_func = self.stupid_ai_face  # AI move
+        if player_is_protagonist:  # human move
+            face_picker_func = self.prompt_face
+        self.next_face = self.pick_a_face(choice_method=face_picker_func,
+                                          player_hand=player_hand,
+                                          current_face=self.table.cards[-2].face,
+                                          available_faces=self.deck.faces)
+        print(f"{player_name} chose {self.next_face[1]} as the next face.")
+
     def run(self, protagonist: str | None = None):
         print(f"Table: {self.table.cards[-1]}")
         # In case of a 7, records how many cards are to be drawn if 7 chain is not continued
@@ -219,8 +301,9 @@ class MauMau:
                 if player_name in self.finishers:
                     continue
 
-                if len(self.deck.cards) < 1:
-                    self.replenish_deck()
+                player_is_protagonist = protagonist is not None and player_name == protagonist
+
+                self.replenish_deck(1)
 
                 if self.miss_turn:
                     self.miss_turn = False
@@ -230,63 +313,17 @@ class MauMau:
                 def do_player_turn():
                     # Force to draw or chain in case of a 7
                     while True:
-                        picker_func = self.stupid_ai  # AI move
-                        if protagonist is not None and player_name == protagonist:  # human move
-                            picker_func = self.prompt_card
+                        choice = self.choose_action(player_is_protagonist, player_hand)
 
-                        choice = self.pick_a_card(choice_method=picker_func,
-                                                  player_hand=player_hand,
-                                                  current_card=self.table.cards[-1],
-                                                  current_face=self.next_face,
-                                                  cards_to_draw=self.cards_to_draw,  # the only affection so far
-                                                  active_players_card_count={pn: len(ph.cards) for pn, ph in
-                                                                             self.player_hands.items()})
                         if choice == "d":
-                            if len(self.deck.cards) < self.cards_to_draw:
-                                self.replenish_deck()
-                                if len(self.deck.cards) < self.cards_to_draw:
-                                    self.cards_to_draw = len(self.deck.cards)
-                            if self.cards_to_draw > 0:
-                                player_hand.draw_from(self.deck, self.cards_to_draw)
-                                player_hand.sort()
-                            if self.cards_to_draw == 1:
-                                print(f"{player_name} drew a card, and has {len(player_hand.cards)} cards left.")
-                            else:
-                                print(f"{player_name} drew {self.cards_to_draw} cards, "
-                                      f"and has {len(player_hand.cards)} cards left.")
-                            self.cards_to_draw = 1
-                        else:
-                            if self.cards_to_draw > 1 and player_hand.cards[choice].rank[1] != 7:
-                                print(f"You cannot play a {player_hand.cards[choice].rank[1]} in response to a 7!")
-                                print(f"You have to either draw {self.cards_to_draw} cards or chain with another 7!")
+                            self.draw_cards(player_name, player_hand)
+                        elif isinstance(choice, int):
+                            if self.player_chains(player_hand, choice):
                                 continue
-                            played_card = player_hand.cards.pop(choice)
-                            self.table.cards.append(played_card)
 
-                            print(f"{player_name} played {played_card}, and has {len(player_hand.cards)} cards left.")
-
-                            # Handle 7 - next player has to draw 2 cards or chain
-                            if played_card.rank[1] == 7:
-                                if self.cards_to_draw < 2:
-                                    self.cards_to_draw = 0
-                                self.cards_to_draw += 2
-
-                            # Handle 8 - next player misses their turn
-                            if played_card.rank[1] == 8:
-                                self.miss_turn = True
-
-                            # Handle J - current player can change face to whatever they want
-                            if played_card.rank[1] == "J":
-                                face_picker_func = self.stupid_ai_face  # AI move
-                                if protagonist is not None and player_name == protagonist:  # human move
-                                    face_picker_func = self.prompt_face
-                                self.next_face = self.pick_a_face(choice_method=face_picker_func,
-                                                                  player_hand=player_hand,
-                                                                  current_face=self.table.cards[-2].face,
-                                                                  available_faces=self.deck.faces)
-                                print(f"{player_name} chose {self.next_face[1]} as the next face.")
-                            else:
-                                self.next_face = played_card.face
+                            self.play_card(player_is_protagonist, player_name, player_hand, choice)
+                        else:
+                            raise Exception("Unexpected choice")
                         break
 
                 do_player_turn()
