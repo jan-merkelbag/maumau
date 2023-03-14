@@ -318,7 +318,7 @@ class MauMau:
                         if choice == "d":
                             self.draw_cards(player_name, player_hand)
                         elif isinstance(choice, int):
-                            if self.player_chains(player_hand, choice):
+                            if not self.player_chains(player_hand, choice):
                                 continue
 
                             self.play_card(player_is_protagonist, player_name, player_hand, choice)
