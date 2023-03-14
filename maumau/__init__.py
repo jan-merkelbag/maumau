@@ -242,15 +242,13 @@ class MauMau:
                                 active_players_card_count={pn: len(ph.cards) for pn, ph in
                                                            self.player_hands.items()})
 
-    def player_chains(self, player_hand: Hand, choice: int) -> bool:
+    def enforce_chain(self, picked_card: Card) -> bool:
         """
-        Check if the player chained properly, and tell them otherwise.
-        :param player_hand:
-        :param choice:
-        :return: Whether the player chained.
+        Check if the player needs to chain and chained properly.
+        :return: Whether the player needed to and did chain.
         """
-        if self.cards_to_draw > 1 and player_hand.cards[choice].rank[1] != 7:
-            print(f"You cannot play a {player_hand.cards[choice].rank[1]} in response to a 7!")
+        if self.cards_to_draw > 1 and picked_card.rank[1] != 7:
+            print(f"You cannot play a {picked_card.rank[1]} in response to a 7!")
             print(f"You have to either draw {self.cards_to_draw} cards or chain with another 7!")
             return False
         return True
@@ -318,7 +316,7 @@ class MauMau:
                         if choice == "d":
                             self.draw_cards(player_name, player_hand)
                         elif isinstance(choice, int):
-                            if not self.player_chains(player_hand, choice):
+                            if not self.enforce_chain(player_hand.cards[choice]):
                                 continue
 
                             self.play_card(player_is_protagonist, player_name, player_hand, choice)
