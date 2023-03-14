@@ -12,8 +12,8 @@ class Hand(Deck):
     def sort(self) -> None:
         def compare(l: Card, r: Card):
             if l.face == r.face:
-                return l.rank[0] - r.rank[0]
-            return l.face[0] - r.face[0]
+                return l.rank.index - r.rank.index
+            return l.face.index - r.face.index
 
         self.cards.sort(key=cmp_to_key(compare))
 

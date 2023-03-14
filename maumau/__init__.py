@@ -1,8 +1,9 @@
 import time
 from random import shuffle
-from typing import List, Dict, Callable, Tuple
+from typing import List, Dict, Callable
 
 from cards import Deck, Hand, Card
+from cards.card import IndexedSymbol
 
 
 class MauMau:
@@ -14,7 +15,7 @@ class MauMau:
 
     cards_to_draw: int
     miss_turn: bool
-    next_face: Tuple[int, str]
+    next_face: IndexedSymbol
 
     def __init__(self, player_names: List[str]):
         self.deck = Deck("./packs/french_32.json")
@@ -37,7 +38,7 @@ class MauMau:
     @staticmethod
     def prompt_card(player_hand: Hand,
                     current_card: Card,
-                    current_face: Tuple[int, str],
+                    current_face: IndexedSymbol,
                     cards_to_draw: int,
                     active_players_card_count: Dict[str, int],
                     ) -> int | str:
@@ -46,7 +47,7 @@ class MauMau:
         prompt += "\nd: draw"
         prompt += f"\n{current_card} lies on top of the table."
         if current_face != current_card.face:
-            prompt += f" The current face is {current_face[1]}."
+            prompt += f" The current face is {current_face.symbol}."
         if cards_to_draw > 1:
             prompt += f" If you chose to draw, you will have to draw {cards_to_draw} cards."
         else:
@@ -68,12 +69,12 @@ class MauMau:
         # - is a Jake
         return card.face == self.next_face \
             or card.rank == self.table.cards[-1].rank \
-            or card.rank[1] == "J"
+            or card.rank.symbol == "J"
 
     def stupid_ai(self,
                   player_hand: Hand,
                   current_card: Card,
-                  current_face: Tuple[int, str],
+                  current_face: IndexedSymbol,
                   cards_to_draw: int,
                   active_players_card_count: Dict[str, int],
                   ) -> int | str:
@@ -90,12 +91,12 @@ class MauMau:
         shuffle(player_hand.cards)
         a_jake: int | None = None
         for idx, card in enumerate(player_hand.cards):
-            if card.rank[1] == "J":
+            if card.rank.symbol == "J":
                 a_jake = idx
                 continue  # don't waste Jakes
             if self.is_card_allowed(card):
-                if (current_card.rank[1] == 7 and card.rank[1] == 7) \
-                        or current_card.rank[1] != 7 or cards_to_draw < 2:
+                if (current_card.rank.symbol == "7" and card.rank.symbol == "7") \
+                        or current_card.rank.symbol != "7" or cards_to_draw < 2:
                     return idx
         if a_jake is not None:
             return a_jake
@@ -105,7 +106,7 @@ class MauMau:
                     choice_method: Callable[..., int | str],
                     player_hand: Hand,
                     current_card: Card,
-                    current_face: Tuple[int, str],
+                    current_face: IndexedSymbol,
                     cards_to_draw: int,
                     active_players_card_count: Dict[str, int],
                     ) -> int | str:
@@ -163,7 +164,7 @@ class MauMau:
     def get_draw_count(self):
         count = 0
         for card in reversed(self.table.cards):
-            if card.rank[1] == 7:
+            if card.rank.symbol == "7":
                 count += 2
             else:
                 break
@@ -171,15 +172,15 @@ class MauMau:
 
     @staticmethod
     def prompt_face(player_hand: Hand,
-                    current_face: Tuple[int, str],
-                    available_faces: List[Tuple[int, str]],
-                    ) -> Tuple[int, str]:
+                    current_face: IndexedSymbol,
+                    available_faces: List[IndexedSymbol],
+                    ) -> IndexedSymbol:
         prompt = "Your hand is:\n"
         prompt += "\n".join([f"{card}" for card in player_hand.cards])
         prompt += "\nAvailable faces:\n"
-        prompt += "\n".join([f"{idx + 1}: {face[1]}" for idx, face in enumerate(available_faces)])
+        prompt += "\n".join([f"{idx + 1}: {face.symbol}" for idx, face in enumerate(available_faces)])
         prompt += "\nd: draw"
-        prompt += f"\n{current_face[1]} is the current face."
+        prompt += f"\n{current_face.symbol} is the current face."
         prompt += "\nWhich face do you choose? "
         choice = input(prompt)
 
@@ -187,20 +188,20 @@ class MauMau:
 
     @staticmethod
     def stupid_ai_face(player_hand: Hand,
-                       current_face: Tuple[int, str],
-                       available_faces: List[Tuple[int, str]],
-                       ) -> Tuple[int, str]:
+                       current_face: IndexedSymbol,
+                       available_faces: List[IndexedSymbol],
+                       ) -> IndexedSymbol:
         face_counts: List[int] = [0] * len(available_faces)
         for card in player_hand.cards:
             face_counts[available_faces.index(card.face)] += 1
         return available_faces[max(range(len(face_counts)), key=lambda i: face_counts[i])]
 
     @staticmethod
-    def pick_a_face(choice_method: Callable[..., Tuple[int, str]],
+    def pick_a_face(choice_method: Callable[..., IndexedSymbol],
                     player_hand: Hand,
-                    current_face: Tuple[int, str],
-                    available_faces: List[Tuple[int, str]],
-                    ) -> Tuple[int, str]:
+                    current_face: IndexedSymbol,
+                    available_faces: List[IndexedSymbol],
+                    ) -> IndexedSymbol:
         while True:
             chosen_face = choice_method(player_hand=player_hand,
                                         current_face=current_face,
@@ -247,8 +248,8 @@ class MauMau:
         Check if the player needs to chain and chained properly.
         :return: Whether the player needed to and did chain.
         """
-        if self.cards_to_draw > 1 and picked_card.rank[1] != 7:
-            print(f"You cannot play a {picked_card.rank[1]} in response to a 7!")
+        if self.cards_to_draw > 1 and picked_card.rank.symbol != "7":
+            print(f"You cannot play a {picked_card.rank.symbol} in response to a 7!")
             print(f"You have to either draw {self.cards_to_draw} cards or chain with another 7!")
             return False
         return True
@@ -264,17 +265,17 @@ class MauMau:
         print(f"{player_name} played {played_card}, and has {len(player_hand.cards)} cards left.")
 
         # Handle 7 - next player has to draw 2 cards or chain
-        if played_card.rank[1] == 7:
+        if played_card.rank.symbol == "7":
             if self.cards_to_draw < 2:
                 self.cards_to_draw = 0
             self.cards_to_draw += 2
 
         # Handle 8 - next player misses their turn
-        if played_card.rank[1] == 8:
+        if played_card.rank.symbol == "8":
             self.miss_turn = True
 
         # Handle J - current player can change face to whatever they want
-        if played_card.rank[1] == "J":
+        if played_card.rank.symbol == "J":
             self.choose_face(player_is_protagonist, player_name, player_hand)
         else:
             self.next_face = played_card.face
@@ -287,7 +288,7 @@ class MauMau:
                                           player_hand=player_hand,
                                           current_face=self.table.cards[-2].face,
                                           available_faces=self.deck.faces)
-        print(f"{player_name} chose {self.next_face[1]} as the next face.")
+        print(f"{player_name} chose {self.next_face.symbol} as the next face.")
 
     def run(self, protagonist: str | None = None):
         print(f"Table: {self.table.cards[-1]}")
