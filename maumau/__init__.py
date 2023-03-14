@@ -222,18 +222,46 @@ class MauMau:
 
         return chosen_face
 
-    def draw_cards(self, player_name: str, player_hand: Hand):
+    # noinspection PyUnusedLocal
+    @staticmethod
+    def prompt_to_play_drawn_card(player_hand: Hand, drawn_card: Card):
+        while True:
+            prompt = f"You drew {drawn_card}.\n"
+            prompt += "y - play it\n"
+            prompt += "n - keep it\n"
+            prompt += "What do you want to do? "
+            choice = input(prompt)
+            if choice.lower() == "y":
+                return True
+            if choice.lower() == "n":
+                return False
+
+    # noinspection PyUnusedLocal
+    @staticmethod
+    def stupid_ai_choose_to_play_drawn_card(player_hand: Hand, drawn_card: Card) -> bool:
+        return drawn_card.face.symbol not in ["J", "7"]  # do not waste "good" cards
+
+    def choose_to_play_drawn_card(self, player_is_protagonist: bool, player_hand: Hand, drawn_card: Card) -> bool:
+        choose_func = self.stupid_ai_choose_to_play_drawn_card  # AI move
+        if player_is_protagonist:  # human move
+            choose_func = self.prompt_to_play_drawn_card
+        return choose_func(player_hand=player_hand, drawn_card=drawn_card)
+
+    def draw_cards(self, player_is_protagonist: bool, player_name: str, player_hand: Hand):
         self.replenish_deck(self.cards_to_draw)
         if len(self.deck.cards) < self.cards_to_draw:
             self.cards_to_draw = len(self.deck.cards)
         if self.cards_to_draw > 0:
-            player_hand.draw_from(self.deck, self.cards_to_draw)
+            drawn_cards = player_hand.draw_from(self.deck, self.cards_to_draw)
+            if self.cards_to_draw == 1:
+                print(f"{player_name} drew a card, and has {len(player_hand.cards)} cards left.")
+                if self.is_card_allowed(drawn_cards[0]) \
+                        and self.choose_to_play_drawn_card(player_is_protagonist, player_hand, drawn_cards[0]):
+                    self.play_card(player_is_protagonist, player_name, player_hand, -1)
+            else:
+                print(f"{player_name} drew {self.cards_to_draw} cards, "
+                      f"and has {len(player_hand.cards)} cards left.")
             player_hand.sort()
-        if self.cards_to_draw == 1:
-            print(f"{player_name} drew a card, and has {len(player_hand.cards)} cards left.")
-        else:
-            print(f"{player_name} drew {self.cards_to_draw} cards, "
-                  f"and has {len(player_hand.cards)} cards left.")
         self.cards_to_draw = 1
 
     def choose_action(self, player_is_protagonist: bool, player_hand: Hand) -> int | str:
@@ -336,7 +364,7 @@ class MauMau:
                         choice = self.choose_action(player_is_protagonist, player_hand)
 
                         if choice == "d":
-                            self.draw_cards(player_name, player_hand)
+                            self.draw_cards(player_is_protagonist, player_name, player_hand)
                         elif isinstance(choice, int):
                             if not self.enforce_chain(player_hand.cards[choice]):
                                 continue
