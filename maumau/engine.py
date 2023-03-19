@@ -197,73 +197,81 @@ class MauMau:
         else:
             self.next_face = played_card.face
 
-    def run(self):
-        print(f"Table: {self.table.cards[-1]}")
+    def step_turn(self, turn_no: int = 0):
+        for player in self.players:
+            self.step_player_turn(player=player, turn_no=turn_no)
+
+    def step_player_turn(self, player: BasePlayer, turn_no: int = 0):
+        if self.DEBUG:
+            print("============\n"
+                  "DEBUGGING\n"
+                  "------------\n"
+                  f"Current turn: {turn_no}\n"
+                  f"Table hand: {[str(card.face) + str(card.rank) for card in self.table.cards]}\n"
+                  "%s\n"
+                  f"Next face: {self.next_face}\n"
+                  f"Miss turn: {self.miss_turn}\n"
+                  f"Cards to draw: {self.cards_to_draw}\n"
+                  "============\n" % ("\n".join([f"{player.name}: {player.hand}" for player in self.players]),))
+
+        if player in self.finishers:
+            return
+
+        self.replenish_deck(1)
+
+        if self.miss_turn:
+            self.miss_turn = False
+            print(f"{player.name} is skipped due to card, and has {len(player.hand.cards)} cards left")
+            return
+
+        def do_player_turn():
+            # Force to draw or chain in case of a 7
+            while True:
+                choice = self.choose_action(player)
+
+                if choice == "d":
+                    self.draw_cards(player)
+                elif isinstance(choice, int):
+                    if not self.enforce_chain(player.hand.cards[choice]):
+                        continue
+
+                    try:
+                        self.play_card(player, choice)
+                    except CardNotAllowedError as e:
+                        print(e)
+                        continue
+                else:
+                    raise Exception("Unexpected choice")
+                break
+
+        do_player_turn()
+        sleep_time = 1
+        human_players_left = False
+        for p in self.players:
+            if isinstance(p, HumanPlayer):
+                human_players_left = True
+                break
+        if not human_players_left:
+            sleep_time = .1
+        time.sleep(sleep_time)
+
+        if len(player.hand.cards) == 0:
+            self.finishers.append(player)
+            print(f"{player.name} finished!")
+            if len(self.players) - len(self.finishers) < 2:
+                self.print_scoreboard()
+                return
+
+    def init(self):
         # In case of a 7, records how many cards are to be drawn if 7 chain is not continued
         self.cards_to_draw = 1  # Start at 1, because it is also used for normal drawing
         self.miss_turn = False  # Record if an 8 is played
+
+    def run(self):
+        print(f"Table: {self.table.cards[-1]}")
+        self.init()
         turn = 0
 
         while True:
             turn += 1
-            for player in self.players:
-
-                if self.DEBUG:
-                    print("============\n"
-                          "DEBUGGING\n"
-                          "------------\n"
-                          f"Current turn: {turn}\n"
-                          f"Table hand: {[str(card.face) + str(card.rank) for card in self.table.cards]}\n"
-                          "%s\n"
-                          f"Next face: {self.next_face}\n"
-                          f"Miss turn: {self.miss_turn}\n"
-                          f"Cards to draw: {self.cards_to_draw}\n"
-                          "============\n" % ("\n".join([f"{player.name}: {player.hand}" for player in self.players]),))
-
-                if player in self.finishers:
-                    continue
-
-                self.replenish_deck(1)
-
-                if self.miss_turn:
-                    self.miss_turn = False
-                    print(f"{player.name} is skipped due to card, and has {len(player.hand.cards)} cards left")
-                    continue
-
-                def do_player_turn():
-                    # Force to draw or chain in case of a 7
-                    while True:
-                        choice = self.choose_action(player)
-
-                        if choice == "d":
-                            self.draw_cards(player)
-                        elif isinstance(choice, int):
-                            if not self.enforce_chain(player.hand.cards[choice]):
-                                continue
-
-                            try:
-                                self.play_card(player, choice)
-                            except CardNotAllowedError as e:
-                                print(e)
-                                continue
-                        else:
-                            raise Exception("Unexpected choice")
-                        break
-
-                do_player_turn()
-                sleep_time = 1
-                human_players_left = False
-                for p in self.players:
-                    if isinstance(p, HumanPlayer):
-                        human_players_left = True
-                        break
-                if not human_players_left:
-                    sleep_time = .1
-                time.sleep(sleep_time)
-
-                if len(player.hand.cards) == 0:
-                    self.finishers.append(player)
-                    print(f"{player.name} finished!")
-                    if len(self.players) - len(self.finishers) < 2:
-                        self.print_scoreboard()
-                        return
+            self.step_turn()
